@@ -3,6 +3,8 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +19,33 @@ import (
 var certPath = "ca/server.crt"
 var keyPath = "ca/server.key"
 
+type myhandler struct {
+}
+
+func (h *myhandler) ServeHTTP(w http.ResponseWriter,
+	r *http.Request) {
+	fmt.Printf("info r=" + r.URL.Path)
+	fmt.Printf("Hi, This is an example of http service in golang!\n")
+	switch r.URL.Path {
+	case "/go":
+		httpHandler(w, r)
+	case "/goget":
+		getHttpHandler(w, r)
+	case "/gofile":
+		fileHandler(w, r)
+	case "/gohead":
+		headHttpHandler(w, r)
+	case "/goput":
+		putHttpHandler(w, r)
+	case "/godelete":
+		putHttpHandler(w, r)
+	case "/gopb":
+		pbHttpHandler(w, r)
+	case "/godownload.jpg":
+		downloadHttpHandler(w, r)
+	}
+}
+
 func main() {
 	http.HandleFunc("/go", httpHandler)
 	http.HandleFunc("/goget", getHttpHandler)
@@ -27,7 +56,33 @@ func main() {
 	http.HandleFunc("/gopb", pbHttpHandler)
 	http.HandleFunc("/godownload.jpg", downloadHttpHandler)
 	//http.ListenAndServe("127.0.0.1:8000", nil)
-	error := http.ListenAndServeTLS("127.0.0.1:8085", certPath, keyPath, nil)
+
+	caCrt, err := ioutil.ReadFile("ca/ca.crt")
+	if err != nil {
+		return
+	}
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM(caCrt)
+
+	clientCrt, err := ioutil.ReadFile("ca/client.crt")
+	if err != nil {
+		return
+	}
+	clientPool := x509.NewCertPool()
+	clientPool.AppendCertsFromPEM(clientCrt)
+
+	//初始化一个server 实例。
+	server := &http.Server{
+		//设置宿主机的ip地址，并且端口号为8081
+		Addr:    "127.0.0.1:8085",
+		Handler: &myhandler{},
+		TLSConfig: &tls.Config{
+			ClientCAs:  pool,
+			ClientAuth: tls.RequireAndVerifyClientCert,
+		},
+	}
+	error := server.ListenAndServeTLS(certPath, keyPath)
+	// error := http.ListenAndServeTLS("127.0.0.1:8085", certPath, keyPath, nil)
 	if error != nil {
 		fmt.Printf(error.Error())
 	}
